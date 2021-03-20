@@ -13,7 +13,7 @@ namespace GWC_rest.Controllers
     public class ValuesController : Controller
     {
         UserContext db;
-
+        
         public ValuesController(UserContext accountContext)
         {
             db = accountContext;
