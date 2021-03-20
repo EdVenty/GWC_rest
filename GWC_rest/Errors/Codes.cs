@@ -7,11 +7,11 @@ namespace GWC_rest.Errors
 {
     public class Codes
     {
-        public static int Unknown = 105;
-        public static int LoginLength = 106;
-        public static int PasswordLength = 107;
-        public static int AlreadyRegistered = 108;
-        public static int WrongLoginOrPassword = 109;
-        public static int UserNotFound = 110;
+        public static int Unknown = 0;
+        public static int LoginLength = 422;
+        public static int PasswordLength = 422;
+        public static int AlreadyRegistered = 409;
+        public static int WrongLoginOrPassword = 401;
+        public static int UserNotFound = 404;
     }
 }

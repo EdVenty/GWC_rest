@@ -70,6 +70,10 @@ namespace GWC_rest
 
             services.AddDbContext<ConversationContext>(options =>
                     options.UseSqlServer(Configuration.GetConnectionString("ConversationContext")));
+            services.Configure<IISServerOptions>(options =>
+            {
+                options.AllowSynchronousIO = true;
+            });
         }
 
         public void Configure(IApplicationBuilder app)
@@ -88,6 +92,7 @@ namespace GWC_rest
             {
                 endpoints.MapDefaultControllerRoute();
             });
+
         }
     }
 }

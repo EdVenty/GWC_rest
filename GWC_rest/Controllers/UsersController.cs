@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GWC_rest.Models; // класс Person
 using GWC_rest.Data;
 using GWC_rest.Errors;
+using System.IO;
 
 namespace GWC_rest.Controllers
 {
@@ -27,44 +29,46 @@ namespace GWC_rest.Controllers
             db = accountContext;
             if (db.Users.FirstOrDefault(x => x.Login == "admin") == null)
             {
-                db.Users.Add(new User { Login = "admin", Password = "admin", Role = AccountRoles.Admin });
+                db.Users.Add(new User { Login = "admin", Password = "admin", Role = AccountRoles.Admin, Nickname = "admin", RegistrationDate = DateTimeOffset.Now.ToUnixTimeSeconds() });
                 db.SaveChanges();
             }
         }
 
-        [HttpPost("/register")]
-        public IActionResult Register(string username, string password)
+        [Produces("application/json")]
+        [HttpPost("/auth/register")]
+        public IActionResult Register([FromBody] User user)
         {
-            if (username.Length < 4)
+            if (user.Login.Length < 6)
             {
-                return StatusCode(AuthorizationError.LoginLength.Code, AuthorizationError.LoginLength.Description);
+                return UnprocessableEntity(AuthorizationError.LoginLength.Description);
             }
-            else if (password.Length < 8)
+            else if (user.Password.Length < 8)
             {
-                return StatusCode(AuthorizationError.PasswordLength.Code, AuthorizationError.PasswordLength.Description);
+                return UnprocessableEntity(AuthorizationError.PasswordLength.Description);
             }
-            if (HasUserRegistered(username))
+            if (HasUserRegistered(user.Login))
             {
-                return StatusCode(AuthorizationError.AlreadyRegistered.Code, AuthorizationError.AlreadyRegistered.Description);
+                return Conflict(AuthorizationError.AlreadyRegistered.Description);
             }
-            db.Users.Add(new User { 
-                Login = username, 
-                Password = password, 
-                Role = AccountRoles.User, 
-                Nickname = username,  
+            db.Users.Add(new User {
+                Login = user.Login,
+                Password = user.Password,
+                Role = AccountRoles.User,
+                Nickname = user.Login,
                 RegistrationDate = DateTimeOffset.Now.ToUnixTimeSeconds()
             });
             db.SaveChanges();
-            return Ok();
+            return Ok("User registered");
         }
 
-        [HttpPost("/login")]
-        public IActionResult Login(string username, string password)
+        [Produces("application/json")]
+        [HttpPost("/auth/login")]
+        public IActionResult Login([FromBody] User user)
         {
-            var identity = GetIdentity(username, password);
+            var identity = GetIdentity(user.Login, user.Password);
             if (identity == null)
             {
-                return StatusCode(AuthorizationError.WrongLoginOrPassword.Code, AuthorizationError.WrongLoginOrPassword.Description);
+                return Unauthorized(AuthorizationError.WrongLoginOrPassword.Description);
             }
 
             var now = DateTime.UtcNow;
@@ -78,13 +82,7 @@ namespace GWC_rest.Controllers
                     signingCredentials: new SigningCredentials(AuthOptions.GetSymmetricSecurityKey(), SecurityAlgorithms.HmacSha256));
             var encodedJwt = new JwtSecurityTokenHandler().WriteToken(jwt);
 
-            var response = new
-            {
-                access_token = encodedJwt,
-                username = identity.Name
-            };
-
-            return Json(response);
+            return Ok(encodedJwt);
         }
 
         private bool HasUserRegistered(string username)
@@ -98,6 +96,100 @@ namespace GWC_rest.Controllers
             {
                 return false;
             }
+        }
+
+        private User getUserById(int id)
+        {
+            //Account person = people.FirstOrDefault(x => x.Login == username && x.Password == password);
+            User person = db.Users.FirstOrDefault(x => x.Id == id);
+            if (person != null)
+            {
+                return person;
+            }
+
+            // если пользователя не найдено
+            return null;
+        }
+
+        [HttpGet("/users/getinfo")]
+        public IActionResult GetUserInfo(string UserId, string[] InfoFields)
+        {
+            var user = getUserById(int.Parse(UserId));
+            if (user == null)
+            {
+                return NotFound(UsersError.UserNotFound.Description);
+            }
+
+            var jsonResult = new Dictionary<string, object>();
+            foreach (string param in InfoFields)
+            {
+                switch (param.ToLower())
+                {
+                    case "id":
+                        jsonResult.Add("id", user.Id);
+                        break;
+                    case "nickname":
+                        jsonResult.Add("nickname", user.Nickname);
+                        break;
+                    case "bithday":
+                        jsonResult.Add("bithday", user.Birthday);
+                        break;
+                    default:
+                        jsonResult.Add(param, null);
+                        break;
+                }
+            }
+            return Json(jsonResult);
+        }
+
+        [HttpGet("/users/getmyid")]
+        [Authorize]
+        public IActionResult GetMyId()
+        {
+            User person = db.Users.FirstOrDefault(x => x.Login == User.Identity.Name);
+            if (person == null)
+            {
+                return NotFound(UsersError.UserNotFound.Description);
+            }
+            return Ok(person.Id);
+        }
+
+        [Authorize]
+        [HttpGet("/users/getprivateinfo")]
+        public IActionResult GetPrivateInfo(string[] InfoFields)
+        {
+            User user = db.Users.FirstOrDefault(x => x.Login == User.Identity.Name);
+            if (user == null)
+            {
+                return NotFound(UsersError.UserNotFound.Description);
+            }
+
+            var jsonResult = new Dictionary<string, object>();
+            foreach (string param in InfoFields)
+            {
+                switch (param.ToLower())
+                {
+                    case "id":
+                        jsonResult.Add("id", user.Id);
+                        break;
+                    case "nickname":
+                        jsonResult.Add("nickname", user.Nickname);
+                        break;
+                    case "birthday":
+                        jsonResult.Add("birthday", user.Birthday);
+                        break;
+                    case "login":
+                        jsonResult.Add("login", user.Login);
+                        break;
+                    case "registrationdate":
+                        jsonResult.Add("registrationdate", user.RegistrationDate);
+                        break;
+                    default:
+                        jsonResult.Add(param, null);
+                        break;
+                }
+            }
+            return Json(jsonResult);
         }
 
         private ClaimsIdentity GetIdentity(string username, string password)
