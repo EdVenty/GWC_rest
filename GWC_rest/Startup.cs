@@ -32,6 +32,7 @@ namespace GWC_rest
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
                 .AddEnvironmentVariables();
             Configuration = builder.Build();
+
             //AreaRegistration.RegisterAllAreas();
         }
 
@@ -65,11 +66,11 @@ namespace GWC_rest
             string connection = Configuration.GetConnectionString("AccountsConnection");
             // добавляем контекст MobileContext в качестве сервиса в приложение
             services.AddDbContext<UserContext>(options =>
-                options.UseSqlServer(connection));
+                options
+                    .UseLazyLoadingProxies()
+                    .UseSqlServer(connection)
+                );
             services.AddControllersWithViews();
-
-            services.AddDbContext<ConversationContext>(options =>
-                    options.UseSqlServer(Configuration.GetConnectionString("ConversationContext")));
             services.Configure<IISServerOptions>(options =>
             {
                 options.AllowSynchronousIO = true;

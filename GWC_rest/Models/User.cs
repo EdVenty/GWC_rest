@@ -31,7 +31,7 @@ namespace GWC_rest.Models
         [Required]
         public long RegistrationDate { get; set; }
         [Column("Bithday")]
-        public int Birthday { get; set; }
-        public Image Avatar { get; set; }
+        public long Birthday { get; set; }
+        public virtual Image Avatar { get; set; }
     }
 }

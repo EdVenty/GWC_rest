@@ -10,6 +10,7 @@ using GWC_rest.Models; // класс Person
 using GWC_rest.Data;
 using GWC_rest.Errors;
 using System.IO;
+using GWC_rest.HttpBodyModels.Users;
 
 namespace GWC_rest.Controllers
 {
@@ -50,12 +51,27 @@ namespace GWC_rest.Controllers
             {
                 return Conflict(AuthorizationError.AlreadyRegistered.Description);
             }
+            /*List<ImageSize> imageSizes = new List<ImageSize>(){new ImageSize()
+                {
+                    Height = 462,
+                    Width = 800,
+                    ItemId = "https://srv2-vl.cloudusercontent.chkdev.ru:2243/otval/data/avatar.jpg"
+                }
+            };
+            var avatar = new Image()
+            {
+                CreationDate = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                Description = "Test avatar",
+                Title = "Test avatar",
+                Sizes = imageSizes
+            };*/
             db.Users.Add(new User {
                 Login = user.Login,
                 Password = user.Password,
                 Role = AccountRoles.User,
                 Nickname = user.Login,
-                RegistrationDate = DateTimeOffset.Now.ToUnixTimeSeconds()
+                RegistrationDate = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                Birthday = -1
             });
             db.SaveChanges();
             return Ok("User registered");
@@ -184,12 +200,30 @@ namespace GWC_rest.Controllers
                     case "registrationdate":
                         jsonResult.Add("registrationdate", user.RegistrationDate);
                         break;
+                    case "avatar":
+                        jsonResult.Add("avatar", user.Avatar);
+                        break;
                     default:
                         jsonResult.Add(param, null);
                         break;
                 }
             }
             return Json(jsonResult);
+        }
+
+        [HttpPost("/users/updatepublicinfo")]
+        public IActionResult UpdatePublicInfo([FromBody] UpdatePublicInfo update)
+        {
+            User user = db.Users.FirstOrDefault(x => x.Login == User.Identity.Name);
+            if (user == null)
+            {
+                return NotFound(UsersError.UserNotFound.Description);
+            }
+            if (update.Nickname != null) user.Nickname = update.Nickname;
+            if (update.Birthday >= 0 || update.Birthday == -1) user.Birthday = update.Birthday;
+            if (update.Avatar != null) user.Avatar = update.Avatar;
+            db.SaveChanges();
+            return Ok("Private information successfully updated");
         }
 
         private ClaimsIdentity GetIdentity(string username, string password)
